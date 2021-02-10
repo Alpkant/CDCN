@@ -34,6 +34,7 @@ from models.CDCNs import Conv2d_cd, CDCN, CDCNpp
 from Load_OULUNPU_train import Spoofing_train, Normaliztion, ToTensor, RandomHorizontalFlip, Cutout, RandomErasing
 from Load_OULUNPU_valtest import Spoofing_valtest, Normaliztion_valtest, ToTensor_valtest
 
+from siwdataset import SiwDataset
 
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -204,13 +205,13 @@ def train_test():
     isExists = os.path.exists(args.log)
     if not isExists:
         os.makedirs(args.log)
-    log_file = open(args.log+'/'+ args.log+'_log_P1.txt', 'w')
+    log_file = open(args.log+'/'+ args.log+f'_log_{args.protocol}.txt', 'w')
     
     echo_batches = args.echo_batches
 
-    print("Oulu-NPU, P1:\n ")
+    print(f"SIW, {args.protocol}:\n ")
 
-    log_file.write('Oulu-NPU, P1:\n ')
+    log_file.write(f"SIW, {args.protocol}:\n ")
     log_file.flush()
 
     # load the network, load the pre-trained model in UCF101?
@@ -239,7 +240,7 @@ def train_test():
 
         
         #model = CDCN(basic_conv=Conv2d_cd, theta=0.7)
-	model = CDCNpp(basic_conv=Conv2d_cd, theta=0.7)
+        model = CDCNpp(basic_conv=Conv2d_cd, theta=0.7)
         
 
 
@@ -280,7 +281,8 @@ def train_test():
         model.train()
         
         # load random 16-frame clip data every epoch
-        train_data = Spoofing_train(train_list, train_image_dir, map_dir, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
+        #train_data = Spoofing_train(train_list, train_image_dir, map_dir, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
+        train_data = SiwDataset("train",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
         dataloader_train = DataLoader(train_data, batch_size=args.batchsize, shuffle=True, num_workers=4)
 
         for i, sample_batched in enumerate(dataloader_train):
@@ -343,7 +345,8 @@ def train_test():
                 '''                val             '''
                 ###########################################
                 # val for threshold
-                val_data = Spoofing_valtest(val_list, val_image_dir, val_map_dir, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                #val_data = Spoofing_valtest(val_list, val_image_dir, val_map_dir, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                val_data = SiwDataset("dev",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
                 dataloader_val = DataLoader(val_data, batch_size=1, shuffle=False, num_workers=4)
                 
                 map_score_list = []
@@ -374,7 +377,8 @@ def train_test():
                 '''                test             '''
                 ##########################################
                 # test for ACC
-                test_data = Spoofing_valtest(test_list, test_image_dir, test_map_dir, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                #test_data = Spoofing_valtest(test_list, test_image_dir, test_map_dir, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                test_data = SiwDataset("eval",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists", protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
                 dataloader_test = DataLoader(test_data, batch_size=1, shuffle=False, num_workers=4)
                 
                 map_score_list = []
@@ -429,15 +433,16 @@ def train_test():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="save quality using landmarkpose model")
-    parser.add_argument('--gpu', type=int, default=3, help='the gpu id used for predict')
+    parser.add_argument('--gpu', type=int, default=0, help='the gpu id used for predict')
     parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate')  
-    parser.add_argument('--batchsize', type=int, default=7, help='initial batchsize')  
+    parser.add_argument('--batchsize', type=int, default=8, help='initial batchsize')  
     parser.add_argument('--step_size', type=int, default=500, help='how many epochs lr decays once')  # 500 
     parser.add_argument('--gamma', type=float, default=0.5, help='gamma of optim.lr_scheduler.StepLR, decay of lr')
     parser.add_argument('--echo_batches', type=int, default=50, help='how many batches display once')  # 50
     parser.add_argument('--epochs', type=int, default=1400, help='total training epochs')
     parser.add_argument('--log', type=str, default="CDCNpp_P1", help='log and save model name')
     parser.add_argument('--finetune', action='store_true', default=False, help='whether finetune other models')
+    parser.add_argument('--protocol', type=str, default='Protocol_1', choices=['Protocol_1', 'Protocol_2_1', 'Protocol_2_2', 'Protocol_2_3', 'Protocol_2_3', 'Protocol_3_1', 'Protocol_3_3'], help='SiW protocol name')
 
     args = parser.parse_args()
     train_test()
