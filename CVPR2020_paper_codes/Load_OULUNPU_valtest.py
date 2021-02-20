@@ -73,9 +73,9 @@ class Normaliztion_valtest(object):
         image = (image - 127.5)/128
     """
     def __call__(self, sample):
-        image_x, val_map_x, spoofing_label = sample['image_x'],sample['val_map_x'] ,sample['spoofing_label']
+        image_x, val_map_x, spoofing_label = sample['image_x'],sample['map_x'] ,sample['spoofing_label']
         new_image_x = (image_x - 127.5)/128     # [-1,1]
-        return {'image_x': new_image_x, 'val_map_x': val_map_x , 'spoofing_label': spoofing_label}
+        return {'image_x': new_image_x, 'map_x': val_map_x , 'spoofing_label': spoofing_label}
 
 
 class ToTensor_valtest(object):
@@ -85,12 +85,12 @@ class ToTensor_valtest(object):
     """
 
     def __call__(self, sample):
-        image_x, val_map_x, spoofing_label = sample['image_x'],sample['val_map_x'] ,sample['spoofing_label']
+        image_x, val_map_x, spoofing_label = sample['image_x'],sample['map_x'] ,sample['spoofing_label']
         
         # swap color axis because    BGR2RGB
         # numpy image: (batch_size) x T x H x W x C
         # torch image: (batch_size) x T x C X H X W
-        image_x = image_x[:,:,:,::-1].transpose((0, 3, 1, 2))
+        image_x = image_x[:,:,::-1].transpose((2, 0 , 1))
         image_x = np.array(image_x)
         
         val_map_x = np.array(val_map_x)
@@ -98,7 +98,7 @@ class ToTensor_valtest(object):
         spoofing_label_np = np.array([0],dtype=np.long)
         spoofing_label_np[0] = spoofing_label
         
-        return {'image_x': torch.from_numpy(image_x.astype(np.float)).float(), 'val_map_x': torch.from_numpy(val_map_x.astype(np.float)).float(),'spoofing_label': torch.from_numpy(spoofing_label_np.astype(np.long)).long()} 
+        return {'image_x': torch.from_numpy(image_x.astype(np.float)).float(), 'map_x': torch.from_numpy(val_map_x.astype(np.float)).float(),'spoofing_label': torch.from_numpy(spoofing_label_np.astype(np.long)).long()} 
 
 
 # /home/ztyu/FAS_dataset/OULU/Train_images/          6_3_20_5_121_scene.jpg        6_3_20_5_121_scene.dat
@@ -122,7 +122,7 @@ class Spoofing_valtest(Dataset):
         image_path = os.path.join(self.root_dir, videoname)
         val_map_path = os.path.join(self.val_map_dir, videoname)
              
-        image_x, val_map_x = self.get_single_image_x(image_path, val_map_path, videoname)
+        image_x, map_x = self.get_single_image_x(image_path, val_map_path, videoname)
 		    
         spoofing_label = self.landmarks_frame.iloc[idx, 0]
         if spoofing_label == 1:
@@ -130,7 +130,7 @@ class Spoofing_valtest(Dataset):
         else:
             spoofing_label = 0
             
-        sample = {'image_x': image_x, 'val_map_x':val_map_x , 'spoofing_label': spoofing_label}
+        sample = {'image_x': image_x, 'map_x':map_x , 'spoofing_label': spoofing_label}
 
         if self.transform:
             sample = self.transform(sample)
@@ -142,7 +142,7 @@ class Spoofing_valtest(Dataset):
         interval = files_total//10
         
         image_x = np.zeros((frames_total, 256, 256, 3))
-        val_map_x = np.ones((frames_total, 32, 32))
+        map_x = np.ones((frames_total, 32, 32))
         
         # random choose 1 frame
         for ii in range(frames_total):

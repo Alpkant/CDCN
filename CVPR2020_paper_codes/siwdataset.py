@@ -10,7 +10,7 @@ import torchvision.utils as v_utils
 from torchvision import datasets, transforms
 import os
 import numpy as np
-
+import random 
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import imgaug.augmenters as iaa
 import cv2
@@ -108,7 +108,9 @@ class SiwDataset(Dataset):
 
                 frame_dir = os.path.join(self.main_dir,video_name)
                 for i in os.listdir(frame_dir):
-                    self.annotations.append((os.path.join(frame_dir,i), None, 1))
+                    self.annotations.append((os.path.join(frame_dir,i), None, 0))
+
+        self.annotations = random.choices(self.annotations, k=50000) 
                 
         
     def __len__(self):

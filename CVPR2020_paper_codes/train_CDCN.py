@@ -35,6 +35,7 @@ from Load_OULUNPU_train import Spoofing_train, Normaliztion, ToTensor, RandomHor
 from Load_OULUNPU_valtest import Spoofing_valtest, Normaliztion_valtest, ToTensor_valtest
 
 from siwdataset import SiwDataset
+from sodecdataset import SodecDataset
 
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -221,7 +222,7 @@ def train_test():
         log_file.write('finetune!\n')
         log_file.flush()
             
-        model = CDCN()
+        model = CDCNpp()
         #model = model.cuda()
         model = model.to(device[0])
         model = nn.DataParallel(model, device_ids=device, output_device=device[0])
@@ -282,7 +283,8 @@ def train_test():
         
         # load random 16-frame clip data every epoch
         #train_data = Spoofing_train(train_list, train_image_dir, map_dir, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
-        train_data = SiwDataset("train",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
+        #train_data = SiwDataset("train",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
+        train_data = SodecDataset(dataset_type="train",dir_path="dataset_with_margin",protocol=args.protocol, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Normaliztion()]))
         dataloader_train = DataLoader(train_data, batch_size=args.batchsize, shuffle=True, num_workers=4)
 
         for i, sample_batched in enumerate(dataloader_train):
@@ -295,7 +297,7 @@ def train_test():
             
             # forward + backward + optimize
             map_x, embedding, x_Block1, x_Block2, x_Block3, x_input =  model(inputs)
-           
+            
             
             absolute_loss = criterion_absolute_loss(map_x, map_label)
             contrastive_loss = criterion_contrastive_loss(map_x, map_label)
@@ -332,11 +334,13 @@ def train_test():
     
                     
         #### validation/test
+        """
         if epoch <300:
              epoch_test = 300   
         else:
             epoch_test = 20   
-        #epoch_test = 1
+        """
+        epoch_test = 1
         if epoch % epoch_test == epoch_test-1:    # test every 5 epochs  
             model.eval()
             
@@ -346,7 +350,8 @@ def train_test():
                 ###########################################
                 # val for threshold
                 #val_data = Spoofing_valtest(val_list, val_image_dir, val_map_dir, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
-                val_data = SiwDataset("dev",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                #val_data = SiwDataset("dev",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                val_data = SodecDataset(dataset_type="test",dir_path="dataset_with_margin",protocol=args.protocol,transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
                 dataloader_val = DataLoader(val_data, batch_size=1, shuffle=False, num_workers=4)
                 
                 map_score_list = []
@@ -354,20 +359,16 @@ def train_test():
                 for i, sample_batched in enumerate(dataloader_val):
                     # get the inputs
                     inputs, spoof_label = sample_batched['image_x'].cuda(), sample_batched['spoofing_label'].cuda()
-                    val_maps = sample_batched['val_map_x'].cuda()   # binary map from PRNet
+                    val_maps = sample_batched['map_x'].cuda()   # binary map from PRNet
         
                     optimizer.zero_grad()
                     
                     #pdb.set_trace()
                     map_score = 0.0
-                    for frame_t in range(inputs.shape[1]):
-                        map_x, embedding, x_Block1, x_Block2, x_Block3, x_input =  model(inputs[:,frame_t,:,:,:])
-                        
-                        score_norm = torch.sum(map_x)/torch.sum(val_maps[:,frame_t,:,:])
-                        map_score += score_norm
-                    map_score = map_score/inputs.shape[1]
-                        
-                    map_score_list.append('{} {}\n'.format(map_score, spoof_label[0][0]))
+                    map_x, embedding, x_Block1, x_Block2, x_Block3, x_input =  model(inputs) 
+                    score_norm = torch.sum(map_x[0])
+                    
+                    map_score_list.append('{} {}\n'.format(score_norm, spoof_label[0][0]))
                     #pdb.set_trace()
                 map_score_val_filename = args.log+'/'+ args.log+'_map_score_val.txt'
                 with open(map_score_val_filename, 'w') as file:
@@ -378,7 +379,8 @@ def train_test():
                 ##########################################
                 # test for ACC
                 #test_data = Spoofing_valtest(test_list, test_image_dir, test_map_dir, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
-                test_data = SiwDataset("eval",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists", protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                #test_data = SiwDataset("eval",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists", protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                test_data = SodecDataset(dataset_type="test",dir_path="dataset_with_margin",protocol=args.protocol,transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
                 dataloader_test = DataLoader(test_data, batch_size=1, shuffle=False, num_workers=4)
                 
                 map_score_list = []
@@ -386,20 +388,17 @@ def train_test():
                 for i, sample_batched in enumerate(dataloader_test):
                     # get the inputs
                     inputs, spoof_label = sample_batched['image_x'].cuda(), sample_batched['spoofing_label'].cuda()
-                    test_maps = sample_batched['val_map_x'].cuda()   # binary map from PRNet 
+                    test_maps = sample_batched['map_x'].cuda()   # binary map from PRNet 
         
                     optimizer.zero_grad()
                     
                     #pdb.set_trace()
                     map_score = 0.0
-                    for frame_t in range(inputs.shape[1]):
-                        map_x, embedding, x_Block1, x_Block2, x_Block3, x_input =  model(inputs[:,frame_t,:,:,:])
+                    map_x, embedding, x_Block1, x_Block2, x_Block3, x_input =  model(inputs)
+                    score_norm = torch.sum(map_x[0])
+                    
                         
-                        score_norm = torch.sum(map_x)/torch.sum(test_maps[:,frame_t,:,:])
-                        map_score += score_norm
-                    map_score = map_score/inputs.shape[1]
-                        
-                    map_score_list.append('{} {}\n'.format(map_score, spoof_label[0][0]))
+                    map_score_list.append('{} {}\n'.format(score_norm, spoof_label[0][0]))
                 
                 map_score_test_filename = args.log+'/'+ args.log+'_map_score_test.txt'
                 with open(map_score_test_filename, 'w') as file:
@@ -419,9 +418,9 @@ def train_test():
                 #log_file.write('epoch:%d, Test:  test_threshold= %.4f, test_ACER_test_threshold= %.4f \n\n' % (epoch + 1, test_threshold, test_ACER_test_threshold))
                 log_file.flush()
                 
-        #if epoch <1:    
-        # save the model until the next improvement     
-        #    torch.save(model.state_dict(), args.log+'/'+args.log+'_%d.pkl' % (epoch + 1))
+        if epoch > 0:    
+            #save the model until the next improvement     
+            torch.save(model.state_dict(), args.log+'/'+args.log+'_%d.pkl' % (epoch + 1))
 
 
     print('Finished Training')
@@ -436,13 +435,13 @@ if __name__ == "__main__":
     parser.add_argument('--gpu', type=int, default=0, help='the gpu id used for predict')
     parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate')  
     parser.add_argument('--batchsize', type=int, default=8, help='initial batchsize')  
-    parser.add_argument('--step_size', type=int, default=500, help='how many epochs lr decays once')  # 500 
+    parser.add_argument('--step_size', type=int, default=5, help='how many epochs lr decays once')  # 500 
     parser.add_argument('--gamma', type=float, default=0.5, help='gamma of optim.lr_scheduler.StepLR, decay of lr')
     parser.add_argument('--echo_batches', type=int, default=50, help='how many batches display once')  # 50
     parser.add_argument('--epochs', type=int, default=1400, help='total training epochs')
     parser.add_argument('--log', type=str, default="CDCNpp_P1", help='log and save model name')
     parser.add_argument('--finetune', action='store_true', default=False, help='whether finetune other models')
-    parser.add_argument('--protocol', type=str, default='Protocol_1', choices=['Protocol_1', 'Protocol_2_1', 'Protocol_2_2', 'Protocol_2_3', 'Protocol_2_3', 'Protocol_3_1', 'Protocol_3_3'], help='SiW protocol name')
+    parser.add_argument('--protocol', type=str, default='protocol_1', choices=['protocol_1', 'protocol_2_1', 'protocol_2_2', 'protocol_2_3', 'protocol_2_3', 'protocol_3_1', 'protocol_3_3'], help='SiW protocol name')
 
     args = parser.parse_args()
     train_test()
