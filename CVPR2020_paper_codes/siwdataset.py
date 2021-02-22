@@ -109,9 +109,8 @@ class SiwDataset(Dataset):
                 frame_dir = os.path.join(self.main_dir,video_name)
                 for i in os.listdir(frame_dir):
                     self.annotations.append((os.path.join(frame_dir,i), None, 0))
-
-        self.annotations = random.choices(self.annotations, k=50000) 
-                
+        if self.dataset_type == "train":
+            self.annotations = random.choices(self.annotations, k=80000)     
         
     def __len__(self):
         return(len(self.annotations))
@@ -130,7 +129,8 @@ class SiwDataset(Dataset):
              
         
         # data augment from 'imgaug' --> Add (value=(-40,40), per_channel=True), GammaContrast (gamma=(0.5,1.5))
-        image_x = seq.augment_image(image_x)         
+        if self.dataset_type == "train":
+            image_x = seq.augment_image(image_x)         
         
         sample = {'image_x': image_x, 'map_x': map_x, 'spoofing_label': label}
 

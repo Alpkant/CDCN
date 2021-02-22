@@ -283,8 +283,8 @@ def train_test():
         
         # load random 16-frame clip data every epoch
         #train_data = Spoofing_train(train_list, train_image_dir, map_dir, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
-        #train_data = SiwDataset("train",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
-        train_data = SodecDataset(dataset_type="train",dir_path="dataset_with_margin",protocol=args.protocol, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Normaliztion()]))
+        train_data = SiwDataset("train",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Cutout(), Normaliztion()]))
+        #train_data = SodecDataset(dataset_type="train",dir_path="dataset_with_margin",protocol=args.protocol, transform=transforms.Compose([RandomErasing(), RandomHorizontalFlip(),  ToTensor(), Normaliztion()]))
         dataloader_train = DataLoader(train_data, batch_size=args.batchsize, shuffle=True, num_workers=4)
 
         for i, sample_batched in enumerate(dataloader_train):
@@ -350,9 +350,9 @@ def train_test():
                 ###########################################
                 # val for threshold
                 #val_data = Spoofing_valtest(val_list, val_image_dir, val_map_dir, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
-                #val_data = SiwDataset("dev",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
-                val_data = SodecDataset(dataset_type="test",dir_path="dataset_with_margin",protocol=args.protocol,transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
-                dataloader_val = DataLoader(val_data, batch_size=1, shuffle=False, num_workers=4)
+                val_data = SiwDataset("dev",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists",protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                #val_data = SodecDataset(dataset_type="test",dir_path="dataset_with_margin",protocol=args.protocol,transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                dataloader_val = DataLoader(val_data, batch_size=args.batchsize, shuffle=False, num_workers=4)
                 
                 map_score_list = []
                 
@@ -366,11 +366,13 @@ def train_test():
                     #pdb.set_trace()
                     map_score = 0.0
                     map_x, embedding, x_Block1, x_Block2, x_Block3, x_input =  model(inputs) 
-                    score_norm = torch.sum(map_x[0])
-                    
-                    map_score_list.append('{} {}\n'.format(score_norm, spoof_label[0][0]))
+                    score_norm = torch.sum(map_x,(1,2))        
+
+                    for j,score in enumerate(score_norm):    
+                        map_score_list.append('{} {}\n'.format(score.item(), spoof_label[j].item()))
+
                     #pdb.set_trace()
-                map_score_val_filename = args.log+'/'+ args.log+'_map_score_val.txt'
+                map_score_val_filename = args.log+'/'+ args.protocol+'_map_score_val.txt'
                 with open(map_score_val_filename, 'w') as file:
                     file.writelines(map_score_list)                
                 
@@ -379,9 +381,9 @@ def train_test():
                 ##########################################
                 # test for ACC
                 #test_data = Spoofing_valtest(test_list, test_image_dir, test_map_dir, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
-                #test_data = SiwDataset("eval",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists", protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
-                test_data = SodecDataset(dataset_type="test",dir_path="dataset_with_margin",protocol=args.protocol,transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
-                dataloader_test = DataLoader(test_data, batch_size=1, shuffle=False, num_workers=4)
+                test_data = SiwDataset("eval",dir_path="/storage/alperen/sodecsapp/datasets/SiW/lists", protocol=args.protocol, transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                #test_data = SodecDataset(dataset_type="test",dir_path="dataset_with_margin",protocol=args.protocol,transform=transforms.Compose([Normaliztion_valtest(), ToTensor_valtest()]))
+                dataloader_test = DataLoader(test_data, batch_size=args.batchsize, shuffle=False, num_workers=4)
                 
                 map_score_list = []
                 
@@ -395,12 +397,12 @@ def train_test():
                     #pdb.set_trace()
                     map_score = 0.0
                     map_x, embedding, x_Block1, x_Block2, x_Block3, x_input =  model(inputs)
-                    score_norm = torch.sum(map_x[0])
-                    
-                        
-                    map_score_list.append('{} {}\n'.format(score_norm, spoof_label[0][0]))
+                    score_norm = torch.sum(map_x,(1,2))        
+
+                    for j,score in enumerate(score_norm):    
+                        map_score_list.append('{} {}\n'.format(score.item(), spoof_label[j].item()))
                 
-                map_score_test_filename = args.log+'/'+ args.log+'_map_score_test.txt'
+                map_score_test_filename = args.log+'/'+ args.protocol+'_map_score_test.txt'
                 with open(map_score_test_filename, 'w') as file:
                     file.writelines(map_score_list)    
                 
@@ -435,13 +437,13 @@ if __name__ == "__main__":
     parser.add_argument('--gpu', type=int, default=0, help='the gpu id used for predict')
     parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate')  
     parser.add_argument('--batchsize', type=int, default=8, help='initial batchsize')  
-    parser.add_argument('--step_size', type=int, default=5, help='how many epochs lr decays once')  # 500 
+    parser.add_argument('--step_size', type=int, default=10, help='how many epochs lr decays once')  # 500 
     parser.add_argument('--gamma', type=float, default=0.5, help='gamma of optim.lr_scheduler.StepLR, decay of lr')
     parser.add_argument('--echo_batches', type=int, default=50, help='how many batches display once')  # 50
     parser.add_argument('--epochs', type=int, default=1400, help='total training epochs')
     parser.add_argument('--log', type=str, default="CDCNpp_P1", help='log and save model name')
     parser.add_argument('--finetune', action='store_true', default=False, help='whether finetune other models')
-    parser.add_argument('--protocol', type=str, default='protocol_1', choices=['protocol_1', 'protocol_2_1', 'protocol_2_2', 'protocol_2_3', 'protocol_2_3', 'protocol_3_1', 'protocol_3_3'], help='SiW protocol name')
+    parser.add_argument('--protocol', type=str, default='Protocol_1', choices=['Protocol_1', 'Protocol_2_1', 'Protocol_2_2', 'Protocol_2_3', 'Protocol_2_4', 'Protocol_3_1', 'Protocol_3_2'], help='SiW protocol name')
 
     args = parser.parse_args()
     train_test()
