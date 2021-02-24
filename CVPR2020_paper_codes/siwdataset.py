@@ -110,7 +110,7 @@ class SiwDataset(Dataset):
                 for i in os.listdir(frame_dir):
                     self.annotations.append((os.path.join(frame_dir,i), None, 0))
         if self.dataset_type == "train":
-            self.annotations = random.choices(self.annotations, k=80000)     
+            self.annotations = random.choices(self.annotations, k=50000)     
         
     def __len__(self):
         return(len(self.annotations))
